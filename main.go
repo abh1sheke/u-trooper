@@ -1,5 +1,11 @@
 package main
 
+import (
+	"github.com/abh1sheke/utrooper/cmd"
+)
+
 func main() {
-  println("Hello, world!")
+	if err := cmd.Execute(); err != nil {
+		return
+	}
 }
