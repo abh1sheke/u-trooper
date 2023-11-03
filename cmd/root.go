@@ -1,9 +1,15 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"os"
+
+	localog "github.com/abh1sheke/utrooper/log"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+)
 
 var url, proxy string
-var duration, simul, views int
+var duration, simul, views, count int
 
 var rootCmd = &cobra.Command{
 	Use:   "utroop",
@@ -17,10 +23,16 @@ func Execute() error {
 	if err := rootCmd.Execute(); err != nil {
 		return err
 	}
+	localog.Init()
+	log.WithFields(log.Fields{
+		"URL":       url,
+		"INSTANCES": simul,
+	}).Info("Starting up")
 	return nil
 }
 
 func init() {
+	log.SetOutput(os.Stdout)
 	rootCmd.PersistentFlags().StringVarP(&url, "url", "u", "", "youtube video URL")
 	rootCmd.MarkPersistentFlagRequired("url")
 	rootCmd.PersistentFlags().StringVarP(&proxy, "proxy", "p", "", "proxy server URL")
