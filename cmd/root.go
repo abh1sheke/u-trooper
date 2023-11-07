@@ -10,7 +10,7 @@ import (
 )
 
 var url, proxy string
-var duration, simul, views int
+var duration, instances, views int
 var logLevel uint32
 
 var rootCmd = &cobra.Command{
@@ -20,12 +20,9 @@ var rootCmd = &cobra.Command{
 		localog.Init(logLevel)
 		log.WithFields(log.Fields{
 			"URL":       url,
-			"INSTANCES": simul,
+			"INSTANCES": instances,
 		}).Info("Starting up")
-
-		for i := 0; i < views; i++ {
-			viewer.View(&url)
-		}
+		viewer.StartViewing(views, instances, duration, &url)
 	},
 }
 
@@ -42,7 +39,7 @@ func init() {
 	rootCmd.MarkPersistentFlagRequired("url")
 	rootCmd.PersistentFlags().StringVarP(&proxy, "proxy", "p", "", "proxy server URL")
 	rootCmd.PersistentFlags().IntVarP(&duration, "duration", "d", 50, "watch duration (seconds)")
-	rootCmd.PersistentFlags().IntVarP(&simul, "simul", "s", 1, "number of browser instances open simultaneously")
+	rootCmd.PersistentFlags().IntVarP(&instances, "instances", "i", 1, "number of browser instances open simultaneously")
 	rootCmd.PersistentFlags().IntVarP(&views, "views", "v", 1, "number of desired views")
 	rootCmd.PersistentFlags().Uint32VarP(&logLevel, "log", "l", 5, "log with level n (0-6)")
 }
