@@ -39,7 +39,8 @@ func view(args *viewerArgs) {
 			return
 		}
 		ctx, cancel := newChromeCtx()
-		var classNames string; var ok bool
+		var classNames string
+		var ok bool
 		err := chromedp.Run(ctx, chromedp.Navigate(args.url))
 		if err != nil {
 			log.WithField("reason", err).Error("Could not play video.")
