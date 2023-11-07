@@ -2,52 +2,53 @@ package viewer
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/chromedp/chromedp"
 	log "github.com/sirupsen/logrus"
 )
 
-func skipAd(ctx *context.Context, text *string) (bool, error) {
-	log.Trace("Trying to skip ad!")
-	if *text == "1" || *text == "0" {
-		log.Trace("Skipping ad...")
-		err := chromedp.Run(*ctx,
-			chromedp.WaitVisible(`.ytp-ad-skip-button`),
-			chromedp.Click(`.ytp-ad-skip-button`, chromedp.NodeEnabled),
-		)
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	}
-	return false, nil
-}
+const SkipButton string = `ytp-ad-skip-button`
 
-func handleAds(ctx *context.Context, adCreated, adShowing bool) {
-	if !adShowing {
-		log.Trace("No ads to skip!")
-		return
-	}
+func handleAds(ctx *context.Context) {
+	start := time.Now()
 	for {
-		var previewText string
-		_ = chromedp.Run(*ctx,
-			chromedp.WaitVisible(`.ytp-ad-preview-text`),
-			chromedp.Text(`.ytp-ad-preview-text`, &previewText),
-		)
-		if len(previewText) > 1 {
-			log.Info("Ad is not skippable")
-			_ = chromedp.Run(*ctx,
-				chromedp.WaitNotPresent(`.ad-showing`),
-			)
-			break
+		if time.Since(start) >= (2 * time.Minute) {
+			log.Fatal("Ad timeout reached. Quitting.")
 		}
-		skipped, err := skipAd(ctx, &previewText)
+		var adShowing, skipExists bool
+		err := chromedp.Run(*ctx,
+			chromedp.EvaluateAsDevTools(
+				`document.getElementsByClassName("ad-showing").length >= 1`,
+				&adShowing,
+			),
+			chromedp.EvaluateAsDevTools(
+				fmt.Sprintf(
+					`document.getElementsByClassName("%s").length >= 1`,
+					SkipButton,
+				), &skipExists,
+			),
+		)
 		if err != nil {
 			log.Error(err)
-			log.Warn("Could not skip ad")
+			continue
+		}
+		if !adShowing {
 			break
-		} else if skipped {
+		}
+		if skipExists {
+			log.Trace("Skipping ad...")
+			err := chromedp.Run(*ctx,
+				chromedp.WaitVisible("."+SkipButton),
+				chromedp.Click("."+SkipButton, chromedp.NodeEnabled),
+			)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
 			break
 		}
 	}
+	log.Info("Ads have been skipped.")
 }
