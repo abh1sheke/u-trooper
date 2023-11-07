@@ -9,80 +9,79 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func playVideo(ctx *context.Context) error {
-	return chromedp.Run(*ctx,
-		chromedp.Click(`.ytp-play-btn`, chromedp.NodeVisible),
-	)
+func playVideo() chromedp.Tasks {
+	return chromedp.Tasks{
+		chromedp.WaitVisible(".ytp-play-button"),
+		chromedp.Click(".ytp-play-button"),
+	}
 }
 
-func getPlayerClasses(ctx *context.Context, classNames *string, ok *bool) error {
-	return chromedp.Run(*ctx,
+func getPlayerClasses(classNames *string, ok *bool) chromedp.Tasks {
+	return chromedp.Tasks{
 		chromedp.WaitVisible(`#container > .html5-video-player`),
 		chromedp.AttributeValue(`#container > .html5-video-player`, "class", classNames, ok),
-	)
+	}
 }
 
-func View(url *string) {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", false),
-	)
-	allocCtx, cancel := chromedp.NewExecAllocator(
-		context.Background(),
-		opts...,
-	)
-
+func newChromeCtx() (context.Context, context.CancelFunc) {
 	ctx, cancel := chromedp.NewContext(
-		allocCtx,
+		context.Background(),
 		chromedp.WithErrorf(logError),
 		// chromedp.WithDebugf(logDebug),
 	)
-	defer cancel()
+	return ctx, cancel
+}
 
-	var classNames string
-	var ok bool
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(*url),
-	)
-	if err != nil {
-		log.WithField("reason", err).Error("Could not play video!")
-		return
-	} else {
-		getPlayerClasses(&ctx, &classNames, &ok)
-	}
-
-	if ok {
-		pausedMode := strings.Contains(classNames, "paused-mode")
-		adCreated := strings.Contains(classNames, "ad-created")
-		adShowing := strings.Contains(classNames, "ad-showing")
-
-		if pausedMode {
-			err := playVideo(&ctx)
+func view(args *viewerArgs) {
+	defer args.wg.Done()
+	for {
+		if count := args.viewCount.Load(); count == uint64(args.target) {
+			return
+		}
+		ctx, cancel := newChromeCtx()
+		var classNames string; var ok bool
+		err := chromedp.Run(ctx, chromedp.Navigate(args.url))
+		if err != nil {
+			log.WithField("reason", err).Error("Could not play video.")
+			return
+		} else {
+			err := chromedp.Run(ctx, getPlayerClasses(&classNames, &ok))
 			if err != nil {
-				log.WithField("reason", err).Error("Could not play video!")
+				log.WithField("reason", err).Error("Could not get player classes.")
 				return
 			}
 		}
-
-		if adCreated {
-			log.Info("Handling ads...")
-			for adShowing {
-				handleAds(&ctx, adCreated, adShowing)
-				if err := getPlayerClasses(&ctx, &classNames, &ok); err != nil {
-					log.Error(err)
-					return
-				}
-				adShowing = strings.Contains(classNames, "ad-showing")
-			}
-			log.Info("Ad(s) has been skipped!")
-		}
-
-		err := chromedp.Run(ctx, chromedp.Sleep(50*time.Second))
-		if err != nil {
-			log.Error(err)
+		if !ok {
+			log.Error("Could not fetch video play-state.")
 			return
 		}
-	} else {
-		log.Error("Could not fetch video play-state")
-		return
+		pausedMode := strings.Contains(classNames, "paused-mode")
+		adCreated := strings.Contains(classNames, "ad-created")
+		unstarted := strings.Contains(classNames, "unstarted-mode")
+		if pausedMode || unstarted {
+			err := chromedp.Run(ctx, playVideo())
+			if err != nil {
+				log.WithField("reason", err).Error("Could not play video.")
+				return
+			}
+		}
+		if adCreated {
+			log.Info("Handling ads...")
+			handleAds(&ctx)
+		}
+		err = chromedp.Run(ctx, chromedp.Sleep(args.duration))
+		if err != nil {
+			log.WithField("reason", err).Errorf("Could not watch video for %v.", args.duration)
+			return
+		} else {
+			args.viewCount.Add(1)
+			log.WithFields(
+				log.Fields{
+					"views": args.viewCount.Load(),
+					"tss":   time.Since(args.start),
+				},
+			).Info("View action completed.")
+			cancel()
+		}
 	}
 }
