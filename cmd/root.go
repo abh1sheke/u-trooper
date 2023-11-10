@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 			"URL":       url,
 			"INSTANCES": instances,
 		}).Info("Starting up")
-		viewer.StartViewing(views, instances, duration, &url)
+		viewer.StartViewing(views, instances, duration, &url, &proxy)
 	},
 }
 
