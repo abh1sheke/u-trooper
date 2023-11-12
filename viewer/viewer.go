@@ -1,69 +1,69 @@
 package viewer
 
 import (
-	"context"
 	"strings"
 	"time"
 
+	"github.com/abh1sheke/utrooper/tor"
 	"github.com/chromedp/chromedp"
 	log "github.com/sirupsen/logrus"
 )
 
-func playVideo() chromedp.Tasks {
-	return chromedp.Tasks{
-		chromedp.WaitVisible(".ytp-play-button"),
-		chromedp.Click(".ytp-play-button"),
-	}
-}
-
-func getPlayerClasses(classNames *string, ok *bool) chromedp.Tasks {
-	return chromedp.Tasks{
-		chromedp.WaitVisible(`#container > .html5-video-player`),
-		chromedp.AttributeValue(`#container > .html5-video-player`, "class", classNames, ok),
-	}
-}
-
-func newChromeCtx() (context.Context, context.CancelFunc) {
-	ctx, cancel := chromedp.NewContext(
-		context.Background(),
-		chromedp.WithErrorf(logError),
-		// chromedp.WithDebugf(logDebug),
-	)
-	return ctx, cancel
-}
-
 func view(args *viewerArgs) {
 	defer args.wg.Done()
+	retries := new(retrier)
 	for {
-		if count := args.viewCount.Load(); count == uint64(args.target) {
+		if retries.count > 5 {
+			log.WithField("retries", retries.count).Fatalf("Too many retries.")
+		}
+		count := args.viewCount.Load()
+		if count == uint64(args.target) {
 			return
 		}
-		ctx, cancel := newChromeCtx()
+		if args.proxy.isTor && count > 1 && count%5 == 0 {
+			err := tor.Restart(args.mu)
+			if err != nil {
+				log.WithField("reason", err).
+					Warn("Could not restart tor. IP has not been changed.")
+			}
+		}
+		proxy := args.proxy.url.String()
+		ctx, cancel := newChromeCtx(&proxy)
 		var classNames string
 		var ok bool
 		err := chromedp.Run(ctx, chromedp.Navigate(args.url))
 		if err != nil {
 			log.WithField("reason", err).Error("Could not play video.")
-			return
+			retries.inc()
+			continue
 		} else {
 			err := chromedp.Run(ctx, getPlayerClasses(&classNames, &ok))
 			if err != nil {
 				log.WithField("reason", err).Error("Could not get player classes.")
-				return
+				retries.inc()
+				continue
 			}
 		}
 		if !ok {
 			log.Error("Could not fetch video play-state.")
-			return
+			retries.inc()
+			continue
 		}
 		pausedMode := strings.Contains(classNames, "paused-mode")
 		adCreated := strings.Contains(classNames, "ad-created")
 		unstarted := strings.Contains(classNames, "unstarted-mode")
+		err = handleConsentDialogue(&ctx)
+		if err != nil {
+			log.WithField("reason", err).Error("Could not handle consent dialog")
+			retries.inc()
+			continue
+		}
 		if pausedMode || unstarted {
 			err := chromedp.Run(ctx, playVideo())
 			if err != nil {
 				log.WithField("reason", err).Error("Could not play video.")
-				return
+				retries.inc()
+				continue
 			}
 		}
 		if adCreated {
@@ -73,7 +73,8 @@ func view(args *viewerArgs) {
 		err = chromedp.Run(ctx, chromedp.Sleep(args.duration))
 		if err != nil {
 			log.WithField("reason", err).Errorf("Could not watch video for %v.", args.duration)
-			return
+			retries.inc()
+			continue
 		} else {
 			args.viewCount.Add(1)
 			log.WithFields(
@@ -82,6 +83,7 @@ func view(args *viewerArgs) {
 					"tss":   time.Since(args.start),
 				},
 			).Info("View action completed.")
+			retries.reset()
 			cancel()
 		}
 	}
