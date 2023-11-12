@@ -18,6 +18,33 @@ func (r *retrier) reset() {
 	r.count = 0
 }
 
+func handleConsentDialogue(ctx *context.Context) error {
+	var dialogueExists bool
+	err := chromedp.Run(*ctx,
+		chromedp.WaitVisible("#container > .html5-video-player"),
+		chromedp.EvaluateAsDevTools(
+			`document.querySelectorAll(".eom-v1-dialog").length >= 1`,
+			&dialogueExists,
+		),
+	)
+	if err != nil {
+		return err
+	}
+	if dialogueExists {
+		err = chromedp.Run(*ctx,
+			chromedp.WaitVisible(".yt-spec-button-shape-next--filled"),
+			chromedp.EvaluateAsDevTools(
+				`document.querySelectorAll(".yt-spec-button-shape-next--filled")[1].click()`,
+				nil,
+			),
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return err
+}
+
 func playVideo() chromedp.Tasks {
 	return chromedp.Tasks{
 		chromedp.WaitVisible(".ytp-play-button"),

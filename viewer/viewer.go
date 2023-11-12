@@ -52,6 +52,12 @@ func view(args *viewerArgs) {
 		pausedMode := strings.Contains(classNames, "paused-mode")
 		adCreated := strings.Contains(classNames, "ad-created")
 		unstarted := strings.Contains(classNames, "unstarted-mode")
+		err = handleConsentDialogue(&ctx)
+		if err != nil {
+			log.WithField("reason", err).Error("Could not handle consent dialog")
+			retries.inc()
+			continue
+		}
 		if pausedMode || unstarted {
 			err := chromedp.Run(ctx, playVideo())
 			if err != nil {
