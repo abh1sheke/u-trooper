@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 		log.WithFields(log.Fields{
 			"URL":       url,
 			"INSTANCES": instances,
-		}).Info("Starting up")
+		}).Info("Starting up.")
 		viewer.StartViewing(views, instances, duration, &url, &proxy)
 	},
 }
