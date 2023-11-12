@@ -10,6 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var URI string = "socks5://127.0.0.1:9050"
+
 func Start(mu *sync.Mutex) error {
 	log.Info("Started tor service.")
 	mu.Lock()

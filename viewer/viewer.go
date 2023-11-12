@@ -20,14 +20,15 @@ func view(args *viewerArgs) {
 		if count == uint64(args.target) {
 			return
 		}
-		if count > 1 && count%5 == 0 {
+		if args.proxy.isTor && count > 1 && count%5 == 0 {
 			err := tor.Restart(args.mu)
 			if err != nil {
 				log.WithField("reason", err).
 					Warn("Could not restart tor. IP has not been changed.")
 			}
 		}
-		ctx, cancel := newChromeCtx(&args.proxy)
+		proxy := args.proxy.url.String()
+		ctx, cancel := newChromeCtx(&proxy)
 		var classNames string
 		var ok bool
 		err := chromedp.Run(ctx, chromedp.Navigate(args.url))

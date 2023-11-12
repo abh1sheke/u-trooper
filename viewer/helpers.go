@@ -2,10 +2,8 @@ package viewer
 
 import (
 	"context"
-	"net/url"
 
 	"github.com/chromedp/chromedp"
-	log "github.com/sirupsen/logrus"
 )
 
 type retrier struct {
@@ -35,15 +33,9 @@ func getPlayerClasses(classNames *string, ok *bool) chromedp.Tasks {
 }
 
 func newChromeCtx(proxy *string) (context.Context, context.CancelFunc) {
-	uri := *proxy
-	if _, err := url.ParseRequestURI(uri); err != nil {
-		log.WithFields(log.Fields{"url": uri, "reason": err}).
-			Warn("Could not parse given proxy url")
-		uri = "socks5://127.0.0.1:9050"
-	}
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("headless", false),
-		chromedp.ProxyServer(uri),
+		chromedp.ProxyServer(*proxy),
 		chromedp.Flag("proxy-bypass-list", "<-loopback>"),
 	)
 	alloc, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
