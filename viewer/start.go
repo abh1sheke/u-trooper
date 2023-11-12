@@ -18,6 +18,12 @@ type proxy struct {
 
 func newProxy(url *string) *proxy {
 	p := new(proxy)
+	if len(*url) < 1 {
+		log.Warn("No proxy url given. Defaulting to tor.")
+		p.url, _ = stdurl.Parse(tor.URI)
+		p.isTor = true
+		return p
+	}
 	uri, err := stdurl.ParseRequestURI(*url)
 	p.url = uri
 	if err != nil {
