@@ -61,7 +61,6 @@ func getPlayerClasses(classNames *string, ok *bool) chromedp.Tasks {
 
 func newChromeCtx(proxy *string) (context.Context, context.CancelFunc) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", false),
 		chromedp.ProxyServer(*proxy),
 		chromedp.Flag("proxy-bypass-list", "<-loopback>"),
 	)
